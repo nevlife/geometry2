@@ -34,13 +34,38 @@ import unittest
 from geometry_msgs.msg import Transform, TransformStamped
 import numpy as np
 from sensor_msgs.msg import PointField
-from sensor_msgs_py.point_cloud2 import create_cloud, create_cloud_xyz32, read_points_numpy
+from sensor_msgs_py.point_cloud2 import (
+    create_cloud, create_cloud_xyz32, read_points, read_points_numpy)
 from std_msgs.msg import Header
 import tf2_ros
 from tf2_sensor_msgs import do_transform_cloud, transform_points
 
 
 class PointCloudConversions(unittest.TestCase):
+
+    def test_transform_extra_fields_owns_output(self):
+        points = np.array([(1., 2., 3., 42), (4., 5., 6., 255)], dtype=[
+            ('x', 'f4'), ('y', 'f4'), ('z', 'f4'), ('intensity', 'u4')])
+        fields = [PointField(name=name, offset=i * 4, count=1, datatype=datatype)
+                  for i, (name, datatype) in enumerate(
+                      [('x', 7), ('y', 7), ('z', 7), ('intensity', 6)])]
+        cloud = create_cloud(Header(frame_id='original'), fields, points)
+        original = bytes(cloud.data)
+        transform = TransformStamped()
+        transform.header.frame_id = 'transformed'
+        transform.transform.rotation.w = 1.0
+        transform.transform.translation.x = 10.0
+        output = do_transform_cloud(cloud, transform)
+        actual = read_points(output)
+        np.testing.assert_array_equal(actual['x'], points['x'] + 10)
+        for field in ('y', 'z', 'intensity'):
+            np.testing.assert_array_equal(actual[field], points[field])
+        self.assertEqual(output.header.frame_id, 'transformed')
+        self.assertEqual(cloud.header.frame_id, 'original')
+        self.assertEqual(bytes(cloud.data), original)
+        self.assertFalse(np.shares_memory(np.asarray(output.data), np.asarray(cloud.data)))
+        actual['x'] = 0
+        self.assertEqual(bytes(cloud.data), original)
 
     def setUp(self):
         self.points = np.array([[1, 2, 0], [10, 20, 30]], dtype=np.float32)
