@@ -80,13 +80,13 @@ def transform_points(
             transform.rotation.z
         ]))
 
-    # "Batched" matmul meaning a matmul for each point
-    # First we offset all points by the translation part
-    # followed by a rotation using the rotation matrix
-    return np.einsum(
+    # "Batched" matmul meaning a matmul for each point, a rotation followed by the translation
+    result = np.einsum(
         'ij, pj -> pi',
         transform_rotation_matrix,
-        point_cloud) + transform_translation
+        point_cloud)
+    result += transform_translation
+    return result
 
 
 def do_transform_cloud(
@@ -118,26 +118,16 @@ def do_transform_cloud(
     assert required_fields <= present_fields, \
         'Point cloud needs the fields x, y, and z for the transformation'
 
-    # Read points as structured NumPy array
-    points = read_points(cloud)
-
-    # Transform xyz part of the pointcloud using the given transform
-    transformed_xyz = transform_points(
-        structured_to_unstructured(points[['x', 'y', 'z']]),
-        transform)
-
-    # Check if there are additional fields that need to be merged with the transformed coordinates
-    if required_fields != present_fields:
-        # Merge original array including non coordinate fields with the transformed coordinates
-        result = create_cloud(new_header, cloud.fields, points, cloud.point_step)
-        result_points = read_points(result)
-        result_points[['x', 'y', 'z']] = unstructured_to_structured(transformed_xyz)
-        return result
+    # Copy the cloud, with its point layout and other fields, and transform xyz in the copy
+    result = create_cloud(new_header, cloud.fields, read_points(cloud), cloud.point_step)
+    result_points = read_points(result)
+    xyz = structured_to_unstructured(result_points[['x', 'y', 'z']])
+    transformed_xyz = transform_points(xyz, transform)
+    if np.shares_memory(xyz, result_points):
+        xyz[...] = transformed_xyz
     else:
-        points = transformed_xyz
-
-    # Serialize pointcloud message
-    return create_cloud(new_header, cloud.fields, points)
+        result_points[['x', 'y', 'z']] = unstructured_to_structured(transformed_xyz)
+    return result
 
 
 tf2_ros.TransformRegistration().add(PointCloud2, do_transform_cloud)
