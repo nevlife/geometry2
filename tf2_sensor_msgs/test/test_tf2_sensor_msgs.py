@@ -74,6 +74,26 @@ class PointCloudConversions(unittest.TestCase):
             Header(frame_id='test'),
             self.points)
 
+    def test_transform_padded_points(self):
+        # PCL point types pad points, PointXYZI to 32 bytes.
+        fields = [PointField(name=name, offset=offset, count=1, datatype=PointField.FLOAT32)
+                  for name, offset in [('x', 0), ('y', 4), ('z', 8), ('intensity', 16)]]
+        points = np.zeros(3, dtype={
+            'names': ['x', 'y', 'z', 'intensity'], 'formats': ['f4'] * 4,
+            'offsets': [0, 4, 8, 16], 'itemsize': 32})
+        points['x'] = [1., 2., 3.]
+        points['intensity'] = [7., 8., 9.]
+        cloud = create_cloud(Header(frame_id='original'), fields, points, point_step=32)
+        transform = TransformStamped()
+        transform.transform.rotation.w = 1.0
+        transform.transform.translation.y = 5.0
+        output = do_transform_cloud(cloud, transform)
+        actual = read_points(output)
+        np.testing.assert_array_equal(actual['x'], [1., 2., 3.])
+        np.testing.assert_array_equal(actual['y'], [5., 5., 5.])
+        np.testing.assert_array_equal(actual['intensity'], [7., 8., 9.])
+        self.assertEqual(32, output.point_step)
+
     def test_simple_transform(self):
         k = 300.0
         transform_translate_xyz = TransformStamped()

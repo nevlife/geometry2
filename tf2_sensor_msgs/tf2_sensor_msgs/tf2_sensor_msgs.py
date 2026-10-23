@@ -129,7 +129,7 @@ def do_transform_cloud(
     # Check if there are additional fields that need to be merged with the transformed coordinates
     if required_fields != present_fields:
         # Merge original array including non coordinate fields with the transformed coordinates
-        result = create_cloud(new_header, cloud.fields, points)
+        result = create_cloud(new_header, cloud.fields, points, cloud.point_step)
         result_points = read_points(result)
         result_points[['x', 'y', 'z']] = unstructured_to_structured(transformed_xyz)
         return result
