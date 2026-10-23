@@ -80,11 +80,8 @@ def transform_points(
             transform.rotation.z
         ]))
 
-    # "Batched" matmul meaning a matmul for each point, a rotation followed by the translation
-    result = np.einsum(
-        'ij, pj -> pi',
-        transform_rotation_matrix,
-        point_cloud)
+    # A rotation of each point followed by the translation
+    result = point_cloud @ transform_rotation_matrix.T
     result += transform_translation
     return result
 
