@@ -136,7 +136,7 @@ def do_transform_cloud(
         points = transformed_xyz
 
     # Serialize pointcloud message
-    return create_cloud(new_header, cloud.fields, points)
+    return create_cloud(new_header, cloud.fields, points, point_step=cloud.point_step)
 
 
 tf2_ros.TransformRegistration().add(PointCloud2, do_transform_cloud)
